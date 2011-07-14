@@ -9,9 +9,240 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name = "viewport" content = "width = device-width, initial-scale = 1.0, user-scalable = yes">
+
+<script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=true"></script>
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.4.4.min.js"></script>
+<script type="text/javascript">
+
+// variables
+var coords = [];
+var info = [];
+
+var myLat;
+var myLng;
+var myLocation;
+
+var myOptions = {};
+var neighborhoods = [];
+var neighborhoodsContent = [];
+	
+var markers = [];
+var iterator = 0;
+var map;
+var infowindow;
+
+$(document).ready(function(){
+	
+	getPosition();
+	
+	// login to Foursquare
+	/*$.ajax({
+			url: "https://foursquare.com/oauth2/authenticate?client_id=G5EXU1X14W0D1US3NAYNZZWMXCQWS3MNHTZCYPVS5E4NIC0C&response_type=token&redirect_uri=http://m4psqr.com",
+			cache: false,
+			success: function(html){
+			alert(html);
+		}
+	});	*/
+	//If a user accepts, they will be redirected back to
+	//http://m4psqr.com/#access_token=ACCESS_TOKEN	
+	
+});
+
+function getPosition(){
+	if (navigator.geolocation) 
+	{
+		navigator.geolocation.getCurrentPosition(function(position) 
+		{  
+   			// got the current position and we're ready to initialize
+			init(position);
+		}); 
+	} else {
+		alert("You are not using a browser that supports the features of this website");
+	}
+
+}
+
+function init(position){
+	
+	myLat = position.coords.latitude;
+	myLng = position.coords.longitude;
+	
+	loadMap();	
+	searchVenues();
+	
+}
+
+function loadMap(){
+	
+	myLocation = new google.maps.LatLng(myLat, myLng);
+	
+	myOptions = {
+		zoom: 20,
+		center: myLocation,
+		mapTypeId: google.maps.MapTypeId.ROADMAP
+	}
+	
+	map = new google.maps.Map(document.getElementById("map"), myOptions);
+	infowindow = new google.maps.InfoWindow();
+	
+}
+
+function showMap(){
+	
+	iterator = 0;
+	for (var i = 0; i < coords.length; i++) {
+		setTimeout(function() {
+			addMarker();
+			}, i * 200);
+	}
+	
+}
+
+
+function searchVenues(){
+	// search...
+	// json format: http://developer.foursquare.com/docs/explore.html#req=venues/search%3Fll%3D40.7,-74
+	//$.getJSON("https://api.foursquare.com/v2/venues/search?ll="+myLat+","+myLng+"&oauth_token={ACCESS_TOKEN}", function(json) {
+	$.getJSON("https://api.foursquare.com/v2/venues/search",
+	{
+		ll: myLat+","+myLng,
+		client_id: "G5EXU1X14W0D1US3NAYNZZWMXCQWS3MNHTZCYPVS5E4NIC0C",
+		client_secret: "KQHVKVNNWTG3WYC0AMQVRAIQ10AN3KBWP12S03TCNED1WRXI"
+	},
+	function(json) {
+		showVenues(json.response);
+	});
+
+}
+
+function showVenues(data){
+	// place the venues on the map		
+	for(i in data.groups){
+		switch( data.groups[i].type ){
+			case "trending": 
+				showTrending(data.groups[i].items);
+			break;
+			case "nearby": 
+				showNearby(data.groups[i].items);
+			break;
+			
+		}
+		
+	}
+	
+	showMap();
+	
+}
+
+function showTrending(venues){
+	for(i in venues){
+		var lat = venues[i].location.lat;
+		var lng = venues[i].location.lng;			
+		coords.push( new google.maps.LatLng(lat, lng) );
+		var venue_data = [];
+		venue_data["name"] = venues[i].name;
+		venue_data["address"] = venues[i].location.address;
+		if(venues[i].categories[0] == undefined){
+			venue_data["icon"] = "http://foursquare.com/img/categories/building/default.png";
+		} else {
+			venue_data["icon"] = venues[i].categories[0].icon;
+		}
+		if(venues[i].contact.phone == undefined){
+			venue_data["phone"] = "";
+		} else {
+			venue_data["phone"] = venues[i].contact.phone;
+		}
+		if(venues[i].contact.twitter == undefined){
+			venue_data["twitter"] = "...";
+		} else {
+			venue_data["twitter"] = venues[i].contact.twitter;
+		}
+		info.push( venue_data );
+	}
+}
+
+function showNearby(venues){
+	for(i in venues){
+		var lat = venues[i].location.lat;
+		var lng = venues[i].location.lng;			
+		coords.push( new google.maps.LatLng(lat, lng) );
+		var venue_data = [];
+		venue_data["name"] = venues[i].name;
+		venue_data["address"] = venues[i].location.address;
+		if(venues[i].categories[0] == undefined){
+			venue_data["icon"] = "http://foursquare.com/img/categories/building/default.png";
+		} else {
+			venue_data["icon"] = venues[i].categories[0].icon;
+		}
+		if(venues[i].contact.phone == undefined){
+			venue_data["phone"] = "";
+		} else {
+			venue_data["phone"] = venues[i].contact.phone;
+		}
+		if(venues[i].contact.twitter == undefined){
+			venue_data["twitter"] = "...";
+		} else {
+			venue_data["twitter"] = venues[i].contact.twitter;
+		}
+		info.push( venue_data );
+	}
+	
+}
+	
+
+
+function addMarker() {
+	
+	var marker = new google.maps.Marker({
+	position: coords[iterator],
+	map: map,
+	draggable: false,
+	animation: google.maps.Animation.DROP
+	});
+	
+	// set the marker color
+	marker.setIcon( info[iterator]["icon"] );
+	markers.push(marker);
+	marker.id = iterator;
+	
+	google.maps.event.addListener(marker, 'click', function() {
+		infowindow.content = infoContent(marker.id);
+		infowindow.open(map, marker);
+	});
+	iterator++;
+}
+
+function infoContent( id ){ 
+	
+	var contentString = '<div id="map-info-content">'+
+		'<h2>' + info[ id ]["name"] + '</h2>'+
+		'<p><b>Address</b>: ' + info[ id ]["address"] + '</p> '+
+		'<p><b>Contact</b>: ' + info[ id ]["phone"] + ', @' + info[ id ]["twitter"] + '</p> '+
+		'<p><b>Actions</b>: check in <input type="checkbox" /> auto</p> '+
+		'</div>';
+	return contentString;
+}
+
+</script>
+
+<style>
+*{
+	margin: 0;
+	padding: 0;
+}
+
+html, body, #map{
+	width: 100%;
+	height: 100%;
+}
+
+
+</style>
+
 </head>
 <body>
 
+<div id="map"></div>
 
 </body>
 </html>
